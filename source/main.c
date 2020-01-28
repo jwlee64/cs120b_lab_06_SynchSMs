@@ -125,11 +125,14 @@ void main(void) {
     
     DDRA = 0x00; PORTA = 0xFF;
     DDRC = 0xFF; PORTC = 0x00;
-
+    TimerSet(300);
+	TimerOn();
     state = start;
     cnt = 0;
 
     while (1) {
     	tick();
+    	while(!TimerFlag);
+    	TimerFlag = 0;
     }
 }
