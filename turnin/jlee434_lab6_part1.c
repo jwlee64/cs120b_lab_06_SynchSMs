@@ -22,7 +22,7 @@ volatile unsigned char TimerFlag = 0;
 unsigned long _avr_timer_M = 1;
 unsigned long _avr_timer_cntcurr = 0;
 
-enum States { start, B0, B1, B2, lock, lock_up } state;
+enum States { start, B0, B1, B2 } state;
 
 void TimerOn() {
 	TCCR1B = 0x0B;
@@ -56,11 +56,9 @@ void TimerSet(unsigned long M) {
 void tick() {
 	switch(state){
 		case start: state = B0; break;
-		case B0: if (~PINA & 0x01) state = lock; else state = B1; break;
-		case B1: if (~PINA & 0x01) state = lock; else state = B2; break;
-		case B2: if (~PINA & 0x01) state = lock; else state = B0; break;
-		case lock: if (PINA & 0x01) state = lock_up; break;
-		case lock_up: if (~PINA & 0x01) state = B0; break;
+		case B0: state = B1; break;
+		case B1: state = B2; break;
+		case B2: state = B0; break;
 		default: state = start; break;
 	}
 
@@ -69,8 +67,6 @@ void tick() {
 		case B0: PORTB = 0x01; break;
 		case B1: PORTB = 0x02; break;
 		case B2: PORTB = 0x04; break;
-		case lock: break;
-		case lock_up: break;
 		default: state = start; break;
 	}
 
@@ -78,7 +74,6 @@ void tick() {
 
 void main(void) {
     /* Insert DDR and PORT initializations */
-	DDRB = 0x00; PORTB = 0xFF;
 	DDRB = 0xFF; PORTB = 0x00;
 	TimerSet(300);
 	TimerOn();
