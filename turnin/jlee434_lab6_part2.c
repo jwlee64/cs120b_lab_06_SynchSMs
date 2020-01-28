@@ -1,13 +1,9 @@
 /*	Author: josiahlee
  *  Partner(s) Name: Shiyou Wang
  *	Lab Section:
- *	Assignment: Lab #6  Exercise 1
+ *	Assignment: Lab #6  Exercise 2
  *	Exercise Description: 
  *
- *  Create a synchSM to blink three LEDs connected to ​PB0​, ​PB1​, and ​PB2 in sequence, 
- *  1 second each. Implement that synchSM in C using the method defined in class. 
- *  In addition to demoing your program, you will need to show that your code adheres 
- *  entirely to the method with no variations.
  *
  *	I acknowledge all content contained herein, excluding template or example
  *	code, is my own original work.
@@ -29,11 +25,12 @@ void TimerOn() {
 	OCR1A = 125;
 	TIMSK1 = 0x02;
 	TCNT1 = 0;
-	SREG |- 0x80;
+	_avr_timer_cntcurr = _avr_timer_M;
+	SREG |= 0x80;
 }
 
 void TimerOff() {
-	TCCR1B = 1;
+	TCCR1B = 0x00;
 }
 
 void TimerISR() {
@@ -65,10 +62,10 @@ void tick() {
 	}
 
 	switch(state){
-		case start: PORTB = 0x00; break;
-		case B0: PORTB = 0x01; break;
-		case B1: PORTB = 0x02; break;
-		case B2: PORTB = 0x04; break;
+		case start: PORTC = 0x00; break;
+		case B0: PORTC = 0x01; break;
+		case B1: PORTC = 0x02; break;
+		case B2: PORTC = 0x04; break;
 		case lock: break;
 		case lock_up: break;
 		default: state = start; break;
@@ -78,8 +75,8 @@ void tick() {
 
 void main(void) {
     /* Insert DDR and PORT initializations */
-	DDRB = 0x00; PORTB = 0xFF;
-	DDRB = 0xFF; PORTB = 0x00;
+	DDRA = 0x00; PORTA = 0xFF;
+	DDRC = 0xFF; PORTC = 0x00;
 	TimerSet(300);
 	TimerOn();
 	state = start;
@@ -89,5 +86,4 @@ void main(void) {
     	while(!TimerFlag);
     	TimerFlag = 0;
     }
-    return 1;
 }

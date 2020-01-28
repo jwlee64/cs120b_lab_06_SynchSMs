@@ -29,11 +29,12 @@ void TimerOn() {
 	OCR1A = 125;
 	TIMSK1 = 0x02;
 	TCNT1 = 0;
-	SREG |- 0x80;
+	_avr_timer_cntcurr = _avr_timer_M;
+	SREG |= 0x80;
 }
 
 void TimerOff() {
-	TCCR1B = 1;
+	TCCR1B = 0x00;
 }
 
 void TimerISR() {
@@ -64,9 +65,9 @@ void tick() {
 
 	switch(state){
 		case start: PORTB = 0x00; break;
-		case B0: PORTB = 0x01; break;
-		case B1: PORTB = 0x02; break;
-		case B2: PORTB = 0x04; break;
+		case B0: PORTC = 0x01; break;
+		case B1: PORTC = 0x02; break;
+		case B2: PORTC = 0x04; break;
 		default: state = start; break;
 	}
 
@@ -74,8 +75,8 @@ void tick() {
 
 void main(void) {
     /* Insert DDR and PORT initializations */
-	DDRB = 0xFF; PORTB = 0x00;
-	TimerSet(300);
+	DDRC = 0xFF; PORTC = 0x00;
+	TimerSet(1000);
 	TimerOn();
 	state = start;
     /* Insert your solution below */
@@ -84,5 +85,4 @@ void main(void) {
     	while(!TimerFlag);
     	TimerFlag = 0;
     }
-    return 1;
 }
