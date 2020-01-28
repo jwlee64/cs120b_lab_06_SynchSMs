@@ -1,162 +1,135 @@
-/*	Author: Shiyou Wang swang324
- *  Partner(s) Name: Josiah Lee
- *	Lab Section: 
- *	Assignment: Lab #6  Exercise #3
+  
+/*	Author: josiahlee
+ *  Partner(s) Name: Shiyou Wang
+ *	Lab Section:
+ *	Assignment: Lab #  Exercise #
  *	Exercise Description: [optional - include for your own benefit]
  *
  *	I acknowledge all content contained herein, excluding template or example
  *	code, is my own original work.
  */
-
 #include <avr/io.h>
 #include <avr/interrupt.h>
-
-
-unsigned char curStage=0x00;
-unsigned char btns = 0x00;
-unsigned char temp=0x00;
-
-enum _state {INIT,BEFORE_PLUS_ONE, PLUS_ONE, BEFORE_MINUS_ONE, MINUS_ONE,RESET,STANDBY, LONG_PRESSED} state, restoreState;
-
+#ifdef _SIMULATE_
+#include "simAVRHeader.h"
+#endif
 
 volatile unsigned char TimerFlag = 0;
+unsigned long _avr_timer_M = 1;
+unsigned long _avr_timer_cntcurr = 0;
 
-unsigned long _avr_timer_M = 1; // Default 1 ms.
-unsigned long _avr_timer_cntcurr = 0; // Ticks
+enum States { start, none_pressed, A0_pressed, A1_pressed, both_pressed } state;
 
-void TimerOn(){
-TCCR1B = 0x0B; // Clear timer and set basic unit.    bit3---clear  bit2bit1bit0---time unit options   clock /64  125,000 ticks/s	
-OCR1A = 125;   // Set unit period.           num * ticks/s  = interupt time 
-TIMSK1 = 0x02; // Enable timer	
-
-TCNT1=0;  // Initial counter
-_avr_timer_cntcurr = _avr_timer_M; // TimerISR period in milliseconds
-
-SREG |= 0x80;  //Enable global interrupts
+void TimerOn() {
+	TCCR1B = 0x0B;
+	OCR1A = 125;
+	TIMSK1 = 0x02;
+	TCNT1 = 0;
+	_avr_timer_cntcurr = _avr_timer_M;
+	SREG |= 0x80;
 }
 
-void TimerOff(){	
-TCCR1B = 0x00; // bit3bit1bit0=000: timer off
+void TimerOff() {
+	TCCR1B = 0x00;
 }
 
-void TimerISR(){
-TimerFlag = 1;
+void TimerISR() {
+	TimerFlag = 1;
 }
 
-// TCNT1 == OCR1
-ISR(TIMER1_COMPA_vect){
-_avr_timer_cntcurr--;
-if (_avr_timer_cntcurr == 0){	
-TimerISR();
-_avr_timer_cntcurr = _avr_timer_M;
-}
-}
-
-// Set TimerISR() to tick every M ms
-void TimerSet(unsigned long M){
-_avr_timer_M = M;
-_avr_timer_cntcurr = _avr_timer_M;
+ISR(TIMER1_COMPA_vect) {
+	_avr_timer_cntcurr--;
+	if (_avr_timer_cntcurr == 0){
+		TimerISR();
+		_avr_timer_cntcurr = _avr_timer_M;
+	}
 }
 
-
-void Tick(){
-
-btns = PINA & 0x03;
-
-switch(state){
-
-case INIT:{
-temp = 0x07;
-if(btns==0x01)
-state = BEFORE_PLUS_ONE;
-else if(btns==0x02)
-state = BEFORE_MINUS_ONE;
-else if(btns==0x03)
-state = RESET;
-break;
-}
-case BEFORE_PLUS_ONE:	{
-if(btns==0x00)
-state = PLUS_ONE;
-else{	
-restoreState = PLUS_ONE;
-state = LONG_PRESSED;
-}	
-break;
-}
-case PLUS_ONE:{
-
-if(temp >= 0x09)
-temp = 0x09;
-else
-temp = temp + 0x01;
-
-state = STANDBY;
-
-break;
-}
-case BEFORE_MINUS_ONE:	{
-if(btns==0x00)
-state = MINUS_ONE;
-break;
-
-case MINUS_ONE:
-if(temp <= 0x00)
-temp = 0x00;
-else
-temp = temp - 0x01;
-state = STANDBY;
-break;
-}
-case STANDBY:{
-if(btns == 0x01)
-state = BEFORE_PLUS_ONE;
-else if(btns==0x02)
-state = BEFORE_MINUS_ONE;
-else if(btns == 0x03)
-state = RESET;
-break;
-{
-case RESET:{
-if(btns == 0x03)
-temp = 0x07;
-else
-state = INIT;
-break;
-}
-case LONG_PRESSED:{
-
-curStage++;
-if(curStage==10){
-curStage=0;
-state = restoreState;
-}
-else  {
-state  = LONG_PRESSED;
+void TimerSet(unsigned long M) {
+	_avr_timer_M = M;
+	_avr_timer_cntcurr = _avr_timer_M;
 }
 
-break;
-}
-default:
-break;
+unsigned char cnt;
+
+void tick() {
+	unsigned char a = (~PINA & 0x03);
+	switch ( state ){
+		case start: 
+			state = none_pressed; 
+			PORTC = 0x07;
+			cnt = 0;
+			break;
+		case none_pressed: 	
+			cnt = 0;
+			if ( a == 0x01 ) {
+				state = A0_pressed;
+				if ( PORTC < 9 )
+					PORTC = PORTC + 1;
+			}
+			else if (a == 0x02) {
+				state = A1_pressed;
+				if ( PORTC > 0 )
+					PORTC = PORTC - 1;
+			}
+			else if (a == 0x03) {
+				state = both_pressed;
+			}
+			break;
+		case A0_pressed: 	
+			if ( a == 0x00 ) state = none_pressed;
+			else if (a == 0x02) state = A1_pressed;
+			else if (a == 0x03) state = both_pressed;
+			if (cnt > 10){
+				PORTC = PORTC + 1;
+				cnt = 0;
+			}else {
+				cnt++;
+			}
+			break;
+		case A1_pressed: 
+			if (a == 0x00) state = none_pressed;
+			else if ( a == 0x01 ) state = A0_pressed;
+			else if (a == 0x03) state = both_pressed;
+			if (cnt > 10){
+				PORTC = PORTC - 1;
+				cnt = 0;
+			}else {
+				cnt++;
+			}
+			break;
+		case both_pressed: 	
+			if (a == 0x00) state = none_pressed;
+			else if ( a == 0x01 ) state = A0_pressed;
+			else if (a == 0x02) state = A1_pressed;
+			break;
+		default: state = start; 
+			break;
+	}
+	switch ( state ){
+		case none_pressed: 	
+			break;
+		case A0_pressed: 	
+			break;
+		case A1_pressed: 
+			break;
+		case both_pressed: 	
+			PORTC = 0x00;
+			break;
+		default: state = start; 
+			break;
+	}
 }
 
-PORTC = temp;
+void main(void) {
+    
+    DDRA = 0x00; PORTA = 0xFF;
+    DDRC = 0xFF; PORTC = 0x00;
 
-}
-}
-}
+    state = start;
+    cnt = 0;
 
-int main(void)
-{
-DDRA = 0x00;PORTA = 0xFF;
-DDRC = 0xFF;PORTC = 0x00;
-TimerSet(100); // 100ms
-TimerOn();
-state = INIT;
-while(1) {
-Tick();
-while (!TimerFlag);
-TimerFlag = 0;
-}
+    while (1) {
+    	tick();
+    }
 }
